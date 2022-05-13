@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, createRef } from "react";
 import { SearchIcon, SwitchVerticalIcon } from "@heroicons/react/outline";
 import "./App.css";
 
@@ -173,11 +173,17 @@ export const faqCategories = [
   },
 ];
 
+export const canUseDOM = !!(
+  typeof window !== 'undefined' &&
+  window.document &&
+  window.document.createElement
+);
+
 function App() {
   const [query, setQuery] = useState("");
   const [content, setContent] = useState(faqCategories);
   let [current, setCurrent] = useState(-1);
-  const lisRef = useRef([]);
+  const [elRefs, setElRefs] = useState([]);
   const [isTriggered, setIsTriggered] = useState(true); // cmd + k
 
   useEffect(() => {
@@ -190,17 +196,27 @@ function App() {
   });
 
   useEffect(() => {
-    if (!query) {
-      setContent(faqCategories);
-      return;
+    const items = [];
+    for (const category of content) {
+      for (const answer of category.answers) {
+        items.push(answer);
+      }
     }
+    setElRefs((elRefs) =>
+    items.map(({index}, i) => elRefs[index] || createRef()),
+  );
+  }, [content])
+  
+
+  useEffect(() => {
     const filteredCats = [];
-    for (let category of content) {
+    let ind = 0;
+    for (let category of faqCategories) {
       let filteredAnswers = category.answers.filter(
-        ({ answer, question }) =>
+        ({ answer, question }) => !query ||
           answer.toLowerCase().includes(query) ||
           question.toLowerCase().includes(query)
-      );
+      ).map((x) => ({...x, index: ind++}));
       if (filteredAnswers?.length) {
         filteredCats.push({ ...category, answers: filteredAnswers });
       }
@@ -208,42 +224,41 @@ function App() {
 
     setContent(filteredCats);
   }, [query]);
-
+  
   useEffect(() => {
-    let lis = lisRef.current;
-    console.log(lis);
-    console.log(lis.length - 1);
-
-    window.addEventListener("keydown", (e) => {
+    if(!canUseDOM) return;
+    
+    function handleKeyDown(e) {
+      let _cur = current;
       switch (e.key.toString()) {
         case "ArrowDown":
           e.preventDefault();
-          if (current < lis.length - 1) {
-            setCurrent(current++);
+          if (current < elRefs.length - 1) {
+            _cur++;
           } else
-           {
-            setCurrent(lis.length - 1);
+            {
+            _cur = elRefs.length - 1;
           }
-          lis[current]?.focus();
-          console.log(lis[current], current);
           break;
         case "ArrowUp":
           e.preventDefault();
           if (current === 0) {
-            lis[current]?.focus();
+            _cur = 0;
           } else {
-            setCurrent(current--);
-            lis[current]?.focus();
-          }
-
-          console.log(lis[current], current);
+            _cur = current - 1;
+          }      
           break;
 
         default:
           return;
       }
-    });
-  }, [content]);
+      elRefs[_cur]?.current?.focus();
+      setCurrent(_cur);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [current, elRefs]);
 
   return (
     <div className="h-screen w-screen bg-gray-600">
@@ -271,11 +286,12 @@ function App() {
               {category.answers.map((answer) => (
                 
                 <li
-                  ref={(li) => lisRef.current.push(li)}
+                  key={answer.id + answer.question}
+                  ref={elRefs[answer.index]}
                   tabIndex="-1"
                   id={answer.id}
-                  className="mb-4 focus:bg-white/50 focus:bg-white/50"
-                  key={answer.id + answer.question}
+                  className="mb-4 focus:bg-white/50"
+                  onClick={()=> setCurrent(answer.index)}
                 >
                   <h3 className="text-gray-50">{answer.question}</h3>
                   <p className="text-gray-50/[.3]">{answer.answer}</p>
