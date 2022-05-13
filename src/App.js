@@ -173,12 +173,6 @@ export const faqCategories = [
   },
 ];
 
-export const canUseDOM = !!(
-  typeof window !== 'undefined' &&
-  window.document &&
-  window.document.createElement
-);
-
 function App() {
   const [query, setQuery] = useState("");
   const [content, setContent] = useState(faqCategories);
@@ -225,9 +219,7 @@ function App() {
     setContent(filteredCats);
   }, [query]);
   
-  useEffect(() => {
-    if(!canUseDOM) return;
-    
+  useEffect(() => {    
     function handleKeyDown(e) {
       let _cur = current;
       switch (e.key.toString()) {
